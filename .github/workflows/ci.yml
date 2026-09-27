@@ -109,10 +109,21 @@ jobs:
       - name: Assert the Action outputs, report and summary
         shell: bash
         run: |
+          report="${{ steps.conformance.outputs.report }}"
           test "${{ steps.conformance.outputs.conformant }}" = "true"
           test "${{ steps.conformance.outputs['exit-code'] }}" = "0"
-          grep -q '^### ✅ ' "${{ steps.conformance.outputs.report }}"
-          grep -q 'mcpdump conformance' "$GITHUB_STEP_SUMMARY"
+          # A failing grep is silent by design, so on failure the offending file is
+          # printed: a red job with no contents shown would be undiagnosable.
+          if ! grep -q '^### ✅ ' "$report"; then
+            echo "::error::The report has no success heading. Report contents:"
+            cat "$report"
+            exit 1
+          fi
+          if ! grep -q 'mcpdump conformance' "$GITHUB_STEP_SUMMARY"; then
+            echo "::error::The job summary does not contain the report. Summary contents:"
+            cat "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
   package:
     name: Package

@@ -207,19 +207,30 @@ class WindowsKeyReader:
     _SECOND_BYTE_TIMEOUT = 0.05
 
     def __init__(self, *, msvcrt_module: Any = None) -> None:
-        if msvcrt_module is None:
+        #: ``None`` defers the ``msvcrt`` import to first use. Constructing the
+        #: reader must stay possible on every platform — the same contract the
+        #: POSIX branch follows by taking injected modules — while the import
+        #: itself only ever runs where reading actually happens.
+        self._msvcrt = msvcrt_module
+        self._get: Any = None
+
+    def _reader(self) -> tuple[Any, Any]:
+        """The module and its single-key read function, imported on first use."""
+        if self._msvcrt is None:
             import msvcrt  # noqa: PLC0415 - Windows-only, imported on demand
 
-            msvcrt_module = msvcrt
-        self._msvcrt = msvcrt_module
-        #: ``getwch`` returns ``str`` and ``getch`` returns ``bytes``; the former
-        #: is preferred because it is the only one that handles non-ASCII input.
-        self._get = getattr(msvcrt_module, "getwch", None) or msvcrt_module.getch
+            self._msvcrt = msvcrt
+        if self._get is None:
+            #: ``getwch`` returns ``str`` and ``getch`` returns ``bytes``; the former
+            #: is preferred because it is the only one that handles non-ASCII input.
+            self._get = getattr(self._msvcrt, "getwch", None) or self._msvcrt.getch
+        return self._msvcrt, self._get
 
     def read(self, timeout: float = 0.1) -> KeyPress | None:
+        module, get = self._reader()
         deadline = time.monotonic() + max(0.0, timeout)
         while True:
-            if self._msvcrt.kbhit():
+            if module.kbhit():
                 return decode_windows(*self._read_bytes())
             if time.monotonic() >= deadline:
                 return None
@@ -229,18 +240,19 @@ class WindowsKeyReader:
         """Read one key. A special key needs both bytes, or the second one leaks
         into the next read.
         """
-        first = self._as_text(self._get())
+        module, get = self._reader()
+        first = self._as_text(get())
         if not needs_second_byte(first):
             return first, None
         # Waiting for the second byte is bounded: real sequences arrive together.
         # Waiting forever would freeze the UI, and treating the prefix as a
         # character would deliver an invisible keystroke.
         deadline = time.monotonic() + self._SECOND_BYTE_TIMEOUT
-        while not self._msvcrt.kbhit():
+        while not module.kbhit():
             if time.monotonic() >= deadline:
                 return first, None
             time.sleep(self._POLL_SECONDS)
-        return first, self._as_text(self._get())
+        return first, self._as_text(get())
 
     @staticmethod
     def _as_text(raw: str | bytes) -> str:

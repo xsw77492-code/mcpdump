@@ -12,8 +12,9 @@ env/
 # Tests and coverage
 .pytest_cache/
 # With an explicit --basetemp pytest does not clean up after itself; leaving the
-# directory in the repo would pollute `git status`.
-.pytest_basetemp/
+# directory in the repo would pollute `git status`. The rule covers every basetemp
+# name, not just one.
+.pytest_*/
 .pt_*/
 .coverage
 coverage.xml

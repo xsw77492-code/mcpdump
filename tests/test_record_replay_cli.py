@@ -187,7 +187,11 @@ def test_record_refuses_an_unwritable_path(
     proc = run_mcpdump(["record", "--out", str(missing), server], mcpdump_env)
 
     assert proc.returncode == 1
-    assert "Cannot record" in proc.stderr or "record" in proc.stderr.lower()
+    # The path is one long token: at 80 columns rich wraps it mid-word, and where
+    # it breaks depends on the tmp dir's length, which differs per machine. Only
+    # whitespace-collapsed matching is stable across runners.
+    stderr_flat = " ".join(proc.stderr.split())
+    assert "Cannot record" in stderr_flat or "record" in stderr_flat.lower()
 
 
 # ---------------------------------------------------------------- replay

@@ -102,12 +102,27 @@ def run_check() -> Callable[..., CheckReport]:
     return _run
 
 
+def _deterministic_child_env(env: dict[str, str]) -> None:
+    """Pin subprocess output so assertions read the same bytes on every machine.
+
+    CI markers are dropped and typer's styling override is set: ``GITHUB_ACTIONS``
+    makes typer render ``--help`` with terminal styling, which rewrites the very
+    text several assertions match against, and a child's stdout encoding follows
+    the platform locale unless ``PYTHONIOENCODING`` says otherwise.
+    """
+    env.pop("GITHUB_ACTIONS", None)
+    env.pop("FORCE_COLOR", None)
+    env.pop("PY_COLORS", None)
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
+
+
 def _make_env(language: str) -> dict[str, str]:
     """Build a subprocess environment: put src on PYTHONPATH and pin the output language."""
     env = dict(os.environ)
     env["PYTHONPATH"] = str(ROOT / "src")
-    env["PYTHONIOENCODING"] = "utf-8"
     env["MCPDUMP_LANG"] = language
+    _deterministic_child_env(env)
     return env
 
 
@@ -143,7 +158,8 @@ class FakeHome:
 
     def env(self, **extra: str) -> dict[str, str]:
         """Environment variables pointing at this fake home. ``APPDATA`` has to move too,
-        otherwise Windows reads the real Claude Desktop config from the dev machine.
+        otherwise Windows reads the real Claude Desktop config from the dev machine. The
+        child's output is pinned for deterministic bytes, same as ``_make_env``.
         """
         env = {
             **os.environ,
@@ -153,6 +169,7 @@ class FakeHome:
         }
         env.pop("XDG_CONFIG_HOME", None)
         env.pop("COPILOT_HOME", None)
+        _deterministic_child_env(env)
         env.update(extra)
         return env
 
