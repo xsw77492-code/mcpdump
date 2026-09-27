@@ -31,6 +31,7 @@ the signature -- visible to readers and to linters.
 
 from __future__ import annotations
 
+import sys
 from typing import Annotated
 
 import typer
@@ -337,6 +338,18 @@ def mock(
 
 
 def main() -> None:
+    # Force UTF-8 on the standard streams. On Windows the console code page
+    # (cp1252 by default) cannot encode the Unicode symbols this program prints
+    # (▸, ✓, …), so `mcpdump ls > file` or a non-UTF-8 pipe would raise
+    # UnicodeEncodeError. ``reconfigure`` is a no-op on real terminals and on
+    # streams already in UTF-8; it only matters where the default is wrong.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8")
+            except (ValueError, OSError):  # not a text stream, or already closed
+                pass
     try:
         app()
     except KeyboardInterrupt:

@@ -64,12 +64,17 @@ jobs:
       # repository having an ``examples/`` directory -- which is exactly why the README's
       # first command used to break for anyone who had run ``pip install``.
       - name: Smoke-test the real CLI against the bundled sample server
+        shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           mcpdump ls "python -m mcpdump.demo" --quiet-server
-          mcpdump call "python -m mcpdump.demo" echo --args "{\"text\":\"ci\"}" --no-wire
+          mcpdump call "python -m mcpdump.demo" echo --args '{"text":"ci"}' --no-wire
 
       - name: Assert --json output parses strictly
         shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           mcpdump ls "python -m mcpdump.demo" --json --quiet-server > out.json
           python -c "import json,sys; d=json.load(open('out.json',encoding='utf-8')); assert d['server']['name']=='echo-server'; print('JSON schema OK')"
