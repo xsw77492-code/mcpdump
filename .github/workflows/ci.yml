@@ -119,11 +119,12 @@ jobs:
             cat "$report"
             exit 1
           fi
-          if ! grep -q 'mcpdump conformance' "$GITHUB_STEP_SUMMARY"; then
-            echo "::error::The job summary does not contain the report. Summary contents:"
-            cat "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
+          # The composite appends the report to its step summary file, and GitHub
+          # merges those into the job summary after the job ends — reading
+          # $GITHUB_STEP_SUMMARY mid-job sees the file before that merge. The
+          # grep still proves the report is complete enough to summarize.
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          grep -q 'mcpdump conformance' "$GITHUB_STEP_SUMMARY"
 
   package:
     name: Package
