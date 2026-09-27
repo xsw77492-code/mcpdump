@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose something mcpdump should do.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that mcpdump cannot currently help with?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: What should the command or flag do? Show the invocation you want to work.
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Ways you have worked around it, and why they fall short.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Anything else — related tools, links, how common you think this is.

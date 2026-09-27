@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: ruff + mypy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # Static checks do not depend on the operating system or the Python version, so one
+      # job runs them once. Putting them in the matrix would repeat the same check twelve
+      # times and drown a genuine failure among eleven green runs.
+      - name: Lint
+        run: ruff check src tests
+
+      # No arguments on purpose: which paths to check is decided by ``files`` in
+      # pyproject.toml, so this cannot drift away from a second copy kept here.
+      - name: Type check
+        run: mypy
+
+  test:
+    name: ${{ matrix.os }} · Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # 3.11 was once left out of this matrix while the classifiers claimed support for
+        # it -- claiming it without testing it is the same as not claiming it.
+        python: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Unit and integration tests
+        run: pytest -q
+
+      # ``python -m mcpdump.demo`` rather than ``examples/echo_server.py``: the sample
+      # server now ships inside the package, so the smoke test must not depend on the
+      # repository having an ``examples/`` directory -- which is exactly why the README's
+      # first command used to break for anyone who had run ``pip install``.
+      - name: Smoke-test the real CLI against the bundled sample server
+        run: |
+          mcpdump ls "python -m mcpdump.demo" --quiet-server
+          mcpdump call "python -m mcpdump.demo" echo --args "{\"text\":\"ci\"}" --no-wire
+
+      - name: Assert --json output parses strictly
+        shell: bash
+        run: |
+          mcpdump ls "python -m mcpdump.demo" --json --quiet-server > out.json
+          python -c "import json,sys; d=json.load(open('out.json',encoding='utf-8')); assert d['server']['name']=='echo-server'; print('JSON schema OK')"
+
+  # ``action.yml`` is the only thing in this repository that runs on someone else's
+  # machine -- it can never be executed locally. ``uses: ./`` runs it for real in CI:
+  # the inputs, the outputs, the job summary and the final failing step are all reached.
+  #
+  # ``install: false``: this job has already installed the version from the working tree.
+  # Left on, the Action would fetch a package from PyPI that has **not been published
+  # yet**, so this job would be red until the first release.
+  action:
+    name: action.yml
+    runs-on: ubuntu-latest
+    # On this repository's own pull requests, let the Action really post a comment -- the
+    # only path that actually exercises "comment back to the PR". A pull request from a
+    # fork cannot get that permission; the Action detects it and falls back to the job
+    # summary.
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install the working tree
+        run: python -m pip install .
+
+      - id: conformance
+        uses: ./
+        with:
+          server: python -m mcpdump.demo
+          install: "false"
+
+      - name: Assert the Action outputs, report and summary
+        shell: bash
+        run: |
+          test "${{ steps.conformance.outputs.conformant }}" = "true"
+          test "${{ steps.conformance.outputs['exit-code'] }}" = "0"
+          grep -q '^### ✅ ' "${{ steps.conformance.outputs.report }}"
+          grep -q 'mcpdump conformance' "$GITHUB_STEP_SUMMARY"
+
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      # ``py.typed`` is the PEP 561 marker: without it a downstream install cannot use the
+      # 100% type annotations this project ships. It is an empty file, so it is the easiest
+      # thing to drop during a refactor -- and dropping it breaks nothing locally, which is
+      # why only an assertion can hold the line.
+      - name: Assert py.typed ships in the wheel
+        run: |
+          python -c "import glob,sys,zipfile; w=glob.glob('dist/*.whl')[0]; n=zipfile.ZipFile(w).namelist(); sys.exit('mcpdump/py.typed missing from the wheel') if 'mcpdump/py.typed' not in n else print(w, '->', len(n), 'entries, py.typed OK')"

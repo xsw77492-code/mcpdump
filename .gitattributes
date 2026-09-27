@@ -1,0 +1,25 @@
+# 一律以 LF 存进仓库，检出时也保持 LF。
+#
+# 默认行为是 ``core.autocrlf=true``：提交时 LF→CRLF、检出时 CRLF→LF。看着等价，
+# 实际有两处咬人：
+#
+# 1. **CI 与本机跑的不是同一份字节。** 三个 CI 平台里 Linux/macOS 检出的是 LF，
+#    Windows 检出的是 CRLF。一份"在 Windows 上能过"的改动可能因为行尾不同
+#    在另外两个平台上表现不一样——尤其这个项目会**逐字节搬运报文**，
+#    行尾正是它在意的东西。
+# 2. **diff 会随机变脏。** 谁在没配 ``autocrlf`` 的机器上改一行，整个文件都会被
+#    标成改动，真实改动淹没在噪音里。
+#
+# 指定 ``eol=lf`` 之后，无论谁在哪台机器上克隆，工作区里都是 LF——
+# 三平台跑的是同一份代码，``git diff`` 也只显示真实改动。
+#
+# 注意 ``*.bat`` / ``*.cmd`` 若将来出现必须排除：Windows 批处理对 CRLF 有硬性要求。
+* text=auto eol=lf
+
+# 二进制文件不做行尾转换，也不做 diff（避免 Git 把图片当文本处理）
+*.gif binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+*.whl binary

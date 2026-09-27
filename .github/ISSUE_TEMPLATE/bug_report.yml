@@ -1,0 +1,61 @@
+name: Bug report
+description: Something does not behave the way it should.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. A complete report is one we can
+        act on without a round of questions.
+  - type: input
+    id: version
+    attributes:
+      label: mcpdump version
+      description: "Output of `mcpdump --version` (or the commit hash)."
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 14 / Windows 11 / Ubuntu 22.04"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.1"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you run, what did you expect, what did you get instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: |
+        The exact command you ran. If the server is not the bundled demo, include
+        how to start it. Attaching a recording (`mcpdump record --out session.jsonl
+        '<server command>'`) is the single most useful thing you can add.
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The terminal output, or a screenshot if it is a TUI issue.
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything else
+      description: Version of the MCP server under test, relevant config, links.

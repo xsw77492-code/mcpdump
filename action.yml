@@ -1,0 +1,158 @@
+name: mcpdump conformance
+description: Check an MCP server against the spec and post the report as a pull request comment.
+
+author: xsw77492-code
+
+branding:
+  icon: terminal
+  color: purple
+
+inputs:
+  server:
+    description: >-
+      Command that starts the MCP server on stdio, as one quoted string.
+      Example: "node build/index.js".
+    required: true
+  version:
+    description: mcpdump version to install. Empty installs the latest release.
+    required: false
+    default: ""
+  install:
+    description: >-
+      Install mcpdump from PyPI. Set to "false" when the workflow already has it
+      — this repository's own CI does that so the action is exercised against
+      the working tree instead of a published release.
+    required: false
+    default: "true"
+  python-version:
+    description: >-
+      Python used to run mcpdump. It has nothing to do with the server's own
+      runtime — that is the `server` command's business.
+    required: false
+    default: "3.12"
+  comment:
+    description: >-
+      Post the report as a pull request comment. The report always lands in the
+      job summary, which needs no token and works on pull requests from forks.
+    required: false
+    default: "true"
+  token:
+    description: >-
+      Token used to post the comment. Needs `pull-requests: write`.
+      Pull requests from forks cannot be commented on with the default token.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  conformant:
+    description: '"true" when every check passed.'
+    value: ${{ steps.check.outputs.conformant }}
+  exit-code:
+    description: >-
+      mcpdump's exit code: 0 conformant, 2 not conformant, 3 timeout,
+      4 could not start the server.
+    value: ${{ steps.check.outputs.exit-code }}
+  report:
+    description: Path to the Markdown report inside the runner's temp directory.
+    value: ${{ steps.check.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install mcpdump
+      if: ${{ inputs.install == 'true' }}
+      shell: bash
+      env:
+        MCPDUMP_VERSION: ${{ inputs.version }}
+      run: |
+        # An empty version installs the latest release; a given one pins it. The Action
+        # tag and the package version are independent lines, so freeze both to freeze both.
+        if [ -n "$MCPDUMP_VERSION" ]; then
+          python -m pip install --disable-pip-version-check "mcpdump==$MCPDUMP_VERSION"
+        else
+          python -m pip install --disable-pip-version-check mcpdump
+        fi
+
+    - name: Run conformance checks
+      id: check
+      shell: bash
+      env:
+        MCPDUMP_SERVER: ${{ inputs.server }}
+      run: |
+        # Deliberately no `set -e`: a non-zero exit code here is a *result*, not a script
+        # error. The later steps (comment, summary) must still run; failure is reported
+        # once, by the last step.
+        set -u
+
+        report="$RUNNER_TEMP/mcpdump-report.md"
+        # The report goes to stdout, so it redirects straight into a file. The server's
+        # own stderr stays out of it and lands in the Action log.
+        mcpdump check "$MCPDUMP_SERVER" --markdown > "$report"
+        status=$?
+
+        if [ "$status" -eq 0 ]; then conformant=true; else conformant=false; fi
+        {
+          echo "conformant=$conformant"
+          echo "exit-code=$status"
+          echo "report=$report"
+        } >> "$GITHUB_OUTPUT"
+
+        cat "$report" >> "$GITHUB_STEP_SUMMARY"
+        exit 0
+
+    - name: Post the report as a pull request comment
+      # `pull_request.number` is set only on pull request events; it is null on push and
+      # workflow_dispatch. Testing "has a value" avoids relying on type coercion.
+      if: ${{ inputs.comment == 'true' && github.event.pull_request.number }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        PR: ${{ github.event.pull_request.number }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        REPORT: ${{ steps.check.outputs.report }}
+      run: |
+        set -u
+
+        # A fork's pull request gets a read-only token. That is normal, not a
+        # misconfiguration, so it gets its own message instead of the generic failure.
+        if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+          echo "::warning::This pull request comes from a fork, so the workflow token cannot comment on it. The report is in the job summary."
+          exit 0
+        fi
+
+        body=$(printf '%s\n%s\n' '<!-- mcpdump-conformance -->' "$(cat "$REPORT")")
+
+        # Update the previous comment rather than adding another: ten pushes would leave
+        # ten identical comments. The HTML marker at the top is what claims it.
+        existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+          --jq '.[] | select(.body | startswith("<!-- mcpdump-conformance -->")) | .id' \
+          | tail -n 1)
+
+        if [ -n "$existing" ]; then
+          target="repos/$GITHUB_REPOSITORY/issues/comments/$existing"
+          method=PATCH
+        else
+          target="repos/$GITHUB_REPOSITORY/issues/$PR/comments"
+          method=POST
+        fi
+
+        # Failing to comment must not fail the check: the report is already in the job
+        # summary. A read-only default GITHUB_TOKEN is the other common cause.
+        if ! gh api -X "$method" "$target" -f body="$body"; then
+          echo "::warning::Could not post the report as a comment. The token needs pull-requests: write. The report is in the job summary."
+        fi
+
+    - name: Fail the job when the server is not conformant
+      # The output name contains a hyphen, so it is read with subscript syntax. Getting
+      # it wrong makes this step silently not run.
+      if: ${{ steps.check.outputs['exit-code'] != '0' }}
+      shell: bash
+      run: |
+        code=${{ steps.check.outputs['exit-code'] }}
+        echo "::error::mcpdump conformance failed (exit $code). See the job summary for the report."
+        exit "$code"

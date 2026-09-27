@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Tests and coverage
+.pytest_cache/
+# With an explicit --basetemp pytest does not clean up after itself; leaving the
+# directory in the repo would pollute `git status`.
+.pytest_basetemp/
+.pt_*/
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+
+# Operating systems
+.DS_Store
+Thumbs.db
+
+# Local working state, not part of the repository.
+.workbuddy/

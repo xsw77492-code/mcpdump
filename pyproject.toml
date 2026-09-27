@@ -1,0 +1,87 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcpdump"
+version = "0.1.0"
+description = "The missing terminal toolkit for MCP servers — inspect, call, watch and test any Model Context Protocol server."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = [
+  "mcp",
+  "model-context-protocol",
+  "cli",
+  "tui",
+  "debugging",
+  "testing",
+  "ai-agents",
+  "json-rpc",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Testing",
+  "Topic :: Software Development :: Debuggers",
+]
+dependencies = [
+  "typer>=0.12",
+  "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+  "mypy>=1.10",
+]
+
+[project.scripts]
+mcpdump = "mcpdump.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/xsw77492-code/mcpdump"
+Repository = "https://github.com/xsw77492-code/mcpdump"
+Issues = "https://github.com/xsw77492-code/mcpdump/issues"
+Changelog = "https://github.com/xsw77492-code/mcpdump/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcpdump"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+# ``conftest`` is a real module in the test directory, placed on sys.path by
+# pytest's rootdir. Without declaring it, ruff treats it as a third-party
+# package: the same ``from conftest import ...`` gets grouped with ``mcpdump``
+# in one file and split into its own group in another.
+known-first-party = ["conftest", "mcpdump"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+# Check against the **lowest** supported version, not the local one: declaring
+# ``requires-python = ">=3.10"`` means it must pass on 3.10, or the claim is false.
+#
+# ``tests`` is inside ``strict``'s scope too, with no separate exemption. Enabling
+# it surfaced four real bugs: ``wire_server`` declared a defaulted parameter as
+# required, ``key_value_lines`` did not type its input for ``None``, a test-data
+# tuple had the wrong shape, and ``CompletedProcess`` was missing its type
+# argument. Relaxing the tests by even one notch would let those back in.
+python_version = "3.10"
+files = ["src/mcpdump", "tests"]
+strict = true
