@@ -32,3 +32,6 @@ Thumbs.db
 
 # Local working state, not part of the repository.
 .workbuddy/
+
+# Personal launch notes, not part of the repository.
+docs/PROMOTION.md

@@ -7,9 +7,9 @@
 # interpreter mcpdump is installed into fails the whole recording; confirm with
 # `mcpdump demo --cmd` first.
 #
-# The README currently embeds docs/demo.svg, which is generated offline by
-# `python docs/make_demo_svg.py`. Regenerating a GIF with this tape is the
-# higher-fidelity option once vhs is available.
+# The README embeds docs/demo.gif, generated offline by
+# `python docs/make_demo_gif.py` (Pillow, no extra tooling). Re-recording the
+# GIF with this tape is the higher-fidelity option once vhs is available.
 
 Output docs/demo.gif
 

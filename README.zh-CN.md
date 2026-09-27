@@ -13,7 +13,7 @@
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
-![mcpdump 实际运行：列出一个服务端，然后读取一次工具调用的原始报文](docs/demo.svg)
+![mcpdump 实际运行：列出一个服务端，然后读取一次工具调用的原始报文](docs/demo.gif)
 
 <p align="center">
   <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
